@@ -18,7 +18,6 @@ vendor/ # If you use vendoring, uncomment if needed
 # SQLite Database Files (DO NOT COMMIT DATABASE)
 *.db
 *.sqlite3
-insultapi.db
 
 # GoLand, IntelliJ
 .idea/
@@ -33,12 +32,11 @@ Thumbs.db
 hs_err_pid*
 replay_pid*
 
-.env
-insultAPI.db
 =======
 # Test Output (for Go tests)
 *.test
 
 # Sensitive Config Files
-.env
+*.env
+*.yaml
 >>>>>>> Stashed changes

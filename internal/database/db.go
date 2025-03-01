@@ -5,27 +5,38 @@ import (
 	"database/sql"
 	"fmt"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/spf13/viper"
 	"log"
-	"os"
 )
 
-var tableName = "insults"
+const EnvPath = "DATABASE_PATH"
+const TableName = "insults"
+
 var db *sql.DB
 
 func InitDB() {
-	dbPath := os.Getenv("DATABASE_PATH")
-	if dbPath != "" {
+
+	viper.SetConfigName("config")
+	viper.SetConfigType("yaml")
+	viper.AddConfigPath(".")
+
+	if err := viper.ReadInConfig(); err != nil {
+		log.Println("No config file found, using environment variables instead.")
+	}
+
+	dbPath := viper.GetString("database_path")
+	if dbPath == "" {
 		dbPath = "insultAPI.db"
 	}
 
 	var err error
 	db, err = sql.Open("sqlite3", dbPath)
 	if err != nil {
-		log.Fatal("Failed to open database:", err)
+		log.Fatalf("Failed to open database: %v", err)
 	}
 
 	// Ensure the table exists
-	if !tableExists(db, tableName) {
+	if !tableExists(db) {
 		err = createTable()
 		if err != nil {
 			log.Fatal("Failed to create table:", err)
@@ -34,10 +45,10 @@ func InitDB() {
 	}
 }
 
-func tableExists(db *sql.DB, tableName string) bool {
+func tableExists(db *sql.DB) bool {
 	query := "SELECT name FROM sqlite_master WHERE type='table' AND name=?;"
 	var name string
-	err := db.QueryRow(query, tableName).Scan(&name)
+	err := db.QueryRow(query, TableName).Scan(&name)
 	return err == nil
 }
 

@@ -4,110 +4,39 @@ import (
 	"InsultAPI/internal/api"
 	"InsultAPI/internal/database"
 	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
+	"github.com/spf13/viper"
+	"golang.org/x/time/rate"
+	"log"
+	"strconv"
 )
 
 func main() {
+
+	viper.SetConfigName("config")
+	viper.SetConfigType("yaml")
+	viper.AddConfigPath(".")
+	if err := viper.ReadInConfig(); err != nil {
+		log.Println("No config file found, using environment variables instead.")
+	}
+
+	viper.SetDefault("server_port", 1323)
+	viper.SetDefault("rate_limit", 5)
+
+	port := viper.GetInt("server_port")
+	rateLimit := rate.Limit(viper.GetFloat64("rate_limit"))
+
+	portStr := ":" + strconv.Itoa(port)
+
 	database.InitDB()
 	defer database.CloseDB()
 
 	e := echo.New()
+
+	e.Use(middleware.RateLimiter(middleware.NewRateLimiterMemoryStore(rateLimit)))
+
 	api.SetupRouter(e)
 
-	e.Logger.Fatal(e.Start("127.0.0.1:1323"))
+	log.Printf("Server running on port %d...", port)
+	e.Logger.Fatal(e.Start(portStr))
 }
-
-//package main
-//
-//import (
-//	"InsultAPI/internal/database"
-//	"errors"
-//	"fmt"
-//	"github.com/labstack/echo/v4"
-//	"github.com/labstack/echo/v4/middleware"
-//	"strconv"
-//)
-//
-//func main() {
-//	database.InitDB()
-//	e := echo.New()
-//
-//	e.Use(middleware.RateLimiter(middleware.NewRateLimiterMemoryStore(5)))
-//
-//	e.GET("/insult", getRandomInsult)
-//	e.POST("/insult", addInsult)
-//
-//	e.GET("/insults/all", getAllInsults)
-//	e.POST("/insults", addMultipleInsults)
-//
-//	e.DELETE("/insult/:id", deleteInsult)
-//
-//	e.Logger.Fatal(e.Start("127.0.0.1:1323"))
-//
-//	defer database.CloseDB()
-//}
-//
-//func deleteInsult(c echo.Context) error {
-//	idSTR := c.Param("id")
-//	id, err := strconv.Atoi(idSTR)
-//	if err != nil {
-//		return c.JSON(400, map[string]string{"error": "Invalid ID format"})
-//	}
-//
-//	err = database.DeleteInsult(id)
-//	if err != nil {
-//		if errors.Is(err, errors.New("not_found")) {
-//			return c.JSON(404, map[string]string{"error": "Insult not found"})
-//		}
-//		return c.JSON(500, map[string]string{"error": "An internal error occurred"})
-//	}
-//
-//	return c.JSON(200, map[string]string{"message": "Insult deleted successfully"})
-//}
-//
-//func addInsult(c echo.Context) error {
-//	insultText := c.FormValue("insult")
-//
-//	if insultText == "" {
-//		return c.JSON(400, map[string]string{"error": "Insult cannot be empty"})
-//	}
-//
-//	err := database.AddInsult(insultText)
-//	if err != nil {
-//		return c.JSON(500, map[string]string{"error": "Failed to add insult"})
-//	}
-//
-//	return c.JSON(200, map[string]string{"message": "Insult Added"})
-//}
-//
-//func getRandomInsult(c echo.Context) error {
-//	insult, _ := database.GetRandomInsult()
-//	return c.JSON(200, map[string]string{"insult": insult.Insult})
-//}
-//
-//func getAllInsults(c echo.Context) error {
-//	insultList, _ := database.GetAllInsults()
-//	return c.JSON(200, insultList)
-//}
-//
-//func addMultipleInsults(c echo.Context) error {
-//	var insults []string
-//
-//	// Bind the request body to a slice of strings
-//	if err := c.Bind(&insults); err != nil {
-//		return c.JSON(400, map[string]string{"error": "Invalid input format"})
-//	}
-//
-//	if len(insults) == 0 {
-//		return c.JSON(400, map[string]string{"error": "No insults provided"})
-//	}
-//
-//	// Loop through and add each insult
-//	for _, insult := range insults {
-//		err := database.AddInsult(insult)
-//		if err != nil {
-//			return c.JSON(500, map[string]string{"error": "Failed to add insults"})
-//		}
-//	}
-//
-//	return c.JSON(200, map[string]string{"message": fmt.Sprintf("%d insults added successfully!", len(insults))})
-//}
