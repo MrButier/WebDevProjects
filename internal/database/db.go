@@ -1,7 +1,7 @@
 ﻿package database
 
 import (
-	"InsultAPI/models"
+	"InsultAPI/internal/models"
 	"database/sql"
 	"fmt"
 	_ "github.com/mattn/go-sqlite3"
@@ -15,7 +15,7 @@ var db *sql.DB
 func InitDB() {
 	dbPath := os.Getenv("DATABASE_PATH")
 	if dbPath != "" {
-		dbPath = dbPath + "/insultAPI.db"
+		dbPath = "insultAPI.db"
 	}
 
 	var err error
@@ -42,12 +42,8 @@ func tableExists(db *sql.DB, tableName string) bool {
 }
 
 func createTable() error {
-	_, err := db.Exec(`
-        CREATE TABLE insults (
-            id INTEGER PRIMARY KEY AUTOINCREMENT, 
-            insult TEXT NOT NULL
-        )
-    `)
+	query := "CREATE TABLE insults (id INTEGER PRIMARY KEY AUTOINCREMENT, insult TEXT NOT NULL)"
+	_, err := db.Exec(query)
 	return err
 }
 
@@ -66,8 +62,14 @@ func GetAllInsults() (models.Insults, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to obtain all insults: %w", err)
 	}
-	var insults models.Insults
+	defer func(rows *sql.Rows) {
+		err := rows.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}(rows)
 
+	var insults models.Insults
 	for rows.Next() {
 		var insult models.Insult
 		if err := rows.Scan(&insult.ID, &insult.Insult); err != nil {
@@ -75,9 +77,9 @@ func GetAllInsults() (models.Insults, error) {
 		}
 		insults = append(insults, insult)
 	}
-	err = rows.Close()
-	if err != nil {
-		return nil, err
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error during rows iteration: %w", err)
 	}
 
 	return insults, nil
@@ -103,7 +105,10 @@ func DeleteInsult(insultID int) error {
 	}
 
 	_, err = db.Exec("DELETE FROM insults WHERE id = ?", insultID)
-	return err
+	if err != nil {
+		return fmt.Errorf("failed to delete insult: %w", err)
+	}
+	return nil
 }
 
 func CloseDB() {
